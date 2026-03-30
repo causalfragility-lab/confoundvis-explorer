@@ -19,6 +19,10 @@ The app moves beyond scalar sensitivity metrics by visualizing:
 Traditional sensitivity analysis focuses on single-number summaries (e.g., ITCV, E-value).  
 This tool introduces a **spatial and dynamic perspective**, showing where effects are fragile and how confounding propagates across the surface.
 
+## Theoretical Foundation
+
+This tool implements a differential sensitivity framework for unobserved confounding (Hait, in preparation), which reconceptualizes robustness as a local geometric property of the confounding path. The framework extends classical threshold-based approaches (e.g., ITCV, E-values) by introducing local sensitivity slopes, curvature, and cumulative fragility as core diagnostics.
+
 ## Relation to confoundvis
 This interactive system complements the `confoundvis` R package by providing a visualization layer for sensitivity geometry and fragility analysis.
 
