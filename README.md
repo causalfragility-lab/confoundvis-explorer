@@ -26,4 +26,16 @@ This interactive system complements the `confoundvis` R package by providing a v
 This repository contains the source code for the live interactive explorer.
 
 ##  Citation
-If you use this tool, please cite the repository (see CITATION.cff).
+cff-version: 1.2.0
+title: "confoundvis-explorer: Interactive Sensitivity Geometry"
+message: "If you use this software, please cite it."
+type: software
+authors:
+  - family-names: Hait
+    given-names: Subir
+    orcid: "https://orcid.org/0009-0004-9871-9677"
+repository-code: "https://github.com/causalfragility-lab/confoundvis-explorer"
+url: "https://causalfragility-lab.github.io/confoundvis-explorer/"
+version: "0.1.0"
+date-released: "2026-03-30"
+license: "MIT"
