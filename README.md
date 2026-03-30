@@ -36,6 +36,7 @@ authors:
     orcid: "https://orcid.org/0009-0004-9871-9677"
 repository-code: "https://github.com/causalfragility-lab/confoundvis-explorer"
 url: "https://causalfragility-lab.github.io/confoundvis-explorer/"
+doi: "10.5281/zenodo.19337307"
 version: "0.1.0"
 date-released: "2026-03-30"
 license: "MIT"
