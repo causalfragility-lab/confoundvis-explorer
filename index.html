@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>panelSurface + ITCV — Sensitivity Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #06070f;
+    --panel: #0c0e1a;
+    --panel2: #101220;
+    --border: #1a1d30;
+    --border2: #242840;
+    --accent: #4fd1b8;
+    --accent2: #ff5c6e;
+    --accent3: #f5c842;
+    --accent4: #a78bfa;
+    --text: #c8ccde;
+    --muted: #4a4e6a;
+    --muted2: #6a6e8a;
+    --fragile: #ff3a4a;
+    --robust: #22c78a;
+    --warn: #f59e0b;
+    --surface-a: #131628;
+    --itcv-on: #a78bfa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 270px 1fr 310px;
+    grid-template-rows: 52px 1fr 200px;
+    height: 100vh;
+    gap: 1px;
+    background: var(--border);
+  }
+
+  /* ── HEADER ── */
+  .header {
+    grid-column: 1 / -1;
+    background: var(--panel);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.05rem;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+  .logo span { color: var(--text); font-weight: 400; }
+
+  .badge {
+    font-size: 0.55rem;
+    padding: 2px 7px;
+    border: 1px solid;
+    border-radius: 2px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .badge-teal  { border-color: var(--accent);  color: var(--accent);  }
+  .badge-purple{ border-color: var(--accent4); color: var(--accent4); }
+  .badge-warn  { border-color: var(--warn);    color: var(--warn);    }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.62rem;
+    color: var(--muted);
+  }
+
+  .itcv-mode-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 2px;
+    border: 1px solid var(--border2);
+    font-size: 0.62rem;
+    transition: all 0.3s;
+  }
+  .itcv-mode-indicator.on {
+    border-color: var(--accent4);
+    background: rgba(167,139,250,0.08);
+    color: var(--accent4);
+  }
+  .itcv-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+  .itcv-mode-indicator.on .itcv-dot { background: var(--accent4); }
+
+  /* ── LEFT CONTROLS ── */
+  .controls {
+    background: var(--panel);
+    padding: 16px 14px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+
+  .sec {
+    font-size: 0.55rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    margin-top: 18px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sec:first-child { margin-top: 0; }
+
+  .ctrl {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 12px;
+  }
+
+  .ctrl label {
+    font-size: 0.6rem;
+    color: var(--muted2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .ctrl label .val { color: var(--accent); font-style: italic; }
+
+  input[type=range] {
+    width: 100%;
+    appearance: none;
+    height: 2px;
+    background: var(--border2);
+    outline: none;
+    cursor: pointer;
+    border-radius: 1px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    appearance: none;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  input[type=range]::-webkit-slider-thumb:active { transform: scale(1.3); }
+
+  input[type=range].itcv-slider::-webkit-slider-thumb { background: var(--accent4); }
+  input[type=range].fragile-slider::-webkit-slider-thumb { background: var(--fragile); }
+
+  .trow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 9px;
+    font-size: 0.62rem;
+    color: var(--text);
+  }
+  .trow.itcv-toggle { color: var(--accent4); }
+
+  .tog {
+    position: relative; width: 30px; height: 16px;
+  }
+  .tog input { opacity: 0; width: 0; height: 0; }
+  .tog-track {
+    position: absolute; inset: 0;
+    background: var(--border2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .tog-track::after {
+    content: '';
+    position: absolute;
+    width: 10px; height: 10px;
+    left: 3px; top: 3px;
+    background: var(--muted);
+    border-radius: 50%;
+    transition: 0.2s;
+  }
+  .tog input:checked + .tog-track { background: var(--accent); }
+  .tog input:checked + .tog-track::after { transform: translateX(14px); background: var(--bg); }
+  .tog.itcv-tog input:checked + .tog-track { background: var(--accent4); }
+
+  .math-block {
+    background: var(--surface-a);
+    border-left: 2px solid var(--accent);
+    padding: 7px 9px;
+    font-size: 0.58rem;
+    line-height: 1.7;
+    margin-bottom: 10px;
+  }
+  .math-block .eq { color: var(--accent); font-style: italic; }
+  .math-block .comment { color: var(--muted); }
+  .math-block.itcv { border-color: var(--accent4); }
+  .math-block.itcv .eq { color: var(--accent4); }
+
+  /* ITCV confound block */
+  .confound-section {
+    background: rgba(167,139,250,0.05);
+    border: 1px solid rgba(167,139,250,0.15);
+    border-radius: 3px;
+    padding: 10px;
+    margin-top: 6px;
+    transition: opacity 0.3s;
+  }
+  .confound-section.disabled { opacity: 0.3; pointer-events: none; }
+
+  .confound-label {
+    font-size: 0.58rem;
+    color: var(--accent4);
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+
+  /* ── CANVAS ── */
+  .canvas-wrapper {
+    background: var(--bg);
+    position: relative;
+    overflow: hidden;
+  }
+
+  #threeCanvas { width: 100% !important; height: 100% !important; }
+
+  .canvas-overlay {
+    position: absolute;
+    bottom: 14px; left: 14px;
+    display: flex; gap: 12px;
+    font-size: 0.55rem; color: var(--muted);
+  }
+  .leg { display: flex; align-items: center; gap: 4px; }
+  .leg-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+  .probe-hud {
+    position: absolute;
+    top: 14px; left: 14px;
+    background: rgba(12,14,26,0.88);
+    border: 1px solid var(--border2);
+    padding: 10px 13px;
+    font-size: 0.6rem;
+    line-height: 2;
+    backdrop-filter: blur(6px);
+  }
+  .probe-hud .val { color: var(--accent); font-style: italic; }
+  .probe-hud .itcv-val { color: var(--accent4); font-style: italic; }
+  .probe-hud .fragile-val { color: var(--fragile); font-style: italic; }
+
+  .slope-zero-line {
+    position: absolute;
+    bottom: 14px; right: 14px;
+    background: rgba(12,14,26,0.88);
+    border: 1px solid var(--border2);
+    padding: 8px 12px;
+    font-size: 0.6rem;
+    display: none;
+  }
+  .slope-zero-line.visible { display: block; }
+  .slope-zero-line .zero-warn { color: var(--fragile); font-weight: 500; }
+  .slope-zero-line .zero-ok   { color: var(--robust); }
+
+  /* ── RIGHT PANEL ── */
+  .derivatives {
+    background: var(--panel);
+    padding: 16px 14px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+
+  .dcard {
+    background: var(--surface-a);
+    border: 1px solid var(--border);
+    padding: 11px;
+    margin-bottom: 9px;
+    position: relative;
+    transition: border-color 0.3s;
+  }
+  .dcard::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+  }
+  .dcard.dc1::before { background: var(--accent); }
+  .dcard.dc2::before { background: var(--accent2); }
+  .dcard.dc3::before { background: var(--accent3); }
+  .dcard.dc4::before { background: var(--accent4); }
+  .dcard.fragile { border-color: rgba(255,58,74,0.4); }
+  .dcard.robust  { border-color: rgba(34,199,138,0.25); }
+
+  .dname { font-size: 0.55rem; letter-spacing: 0.08em; color: var(--muted2); margin-bottom: 3px; }
+  .deq   { font-family: 'Syne', sans-serif; font-size: 0.82rem; color: var(--text); margin-bottom: 5px; }
+  .dval  { font-size: 1.05rem; font-family: 'Syne', sans-serif; font-weight: 700; }
+  .dval.pos { color: var(--accent); }
+  .dval.neg { color: var(--accent2); }
+  .dval.zero-crossing { color: var(--fragile); animation: pulse 1s infinite; }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .dbar { height: 3px; background: var(--border); margin-top: 7px; border-radius: 2px; overflow: hidden; position: relative; }
+  .dfill { height: 100%; border-radius: 2px; transition: width 0.25s ease; }
+
+  /* Adjusted slope bar (ITCV) */
+  .adj-bar-wrap {
+    margin-top: 8px;
+    display: none;
+  }
+  .adj-bar-wrap.visible { display: block; }
+  .adj-bar-label { font-size: 0.55rem; color: var(--muted); margin-bottom: 3px; display: flex; justify-content: space-between; }
+  .adj-bar-track { height: 5px; background: var(--border); border-radius: 3px; position: relative; overflow: visible; }
+  .adj-bar-fill  { height: 100%; border-radius: 3px; transition: width 0.3s, background 0.3s; position: relative; }
+  .adj-zero-marker {
+    position: absolute;
+    top: -4px; width: 2px; height: 13px;
+    background: var(--fragile);
+    border-radius: 1px;
+  }
+
+  .interp { font-size: 0.56rem; color: var(--muted2); margin-top: 5px; line-height: 1.5; font-style: italic; }
+
+  /* ITCV card */
+  .itcv-card {
+    background: rgba(167,139,250,0.05);
+    border: 1px solid rgba(167,139,250,0.2);
+    border-left: 3px solid var(--accent4);
+    padding: 11px;
+    margin-bottom: 9px;
+    display: none;
+    transition: all 0.3s;
+  }
+  .itcv-card.visible { display: block; }
+  .itcv-card .dname { color: rgba(167,139,250,0.7); }
+  .itcv-card .dval  { color: var(--accent4); }
+
+  /* Robustness badge */
+  .robust-badge {
+    display: inline-block;
+    font-size: 0.5rem;
+    padding: 1px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 5px;
+    font-weight: 500;
+  }
+  .rb-fragile { background: rgba(255,58,74,0.15); color: var(--fragile); border: 1px solid rgba(255,58,74,0.3); }
+  .rb-moderate { background: rgba(245,200,66,0.12); color: var(--accent3); border: 1px solid rgba(245,200,66,0.25); }
+  .rb-robust  { background: rgba(34,199,138,0.1); color: var(--robust); border: 1px solid rgba(34,199,138,0.2); }
+
+  /* ── BOTTOM STRIP ── */
+  .bottom-strip {
+    grid-column: 1 / -1;
+    background: var(--border);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1.2fr;
+    gap: 1px;
+  }
+
+  .strip-panel {
+    background: var(--panel);
+    padding: 13px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .strip-title {
+    font-size: 0.54rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .integral-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--accent3);
+    line-height: 1;
+    transition: color 0.3s;
+  }
+
+  .mini-chart { height: 44px; margin-top: 6px; }
+  canvas.mini { width: 100%; height: 100%; }
+  .iinterp { font-size: 0.54rem; color: var(--muted); margin-top: 5px; line-height: 1.4; font-style: italic; }
+
+  /* FRAGILE MASS panel */
+  .fragile-mass-panel {
+    background: var(--panel);
+    padding: 13px 16px;
+    position: relative;
+    overflow: hidden;
+    border-left: 2px solid rgba(255,58,74,0.3);
+    transition: border-color 0.3s;
+  }
+  .fragile-mass-panel.active { border-color: var(--fragile); }
+
+  .fragile-mass-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--muted);
+    line-height: 1;
+    transition: all 0.4s;
+  }
+  .fragile-mass-value.active { color: var(--fragile); }
+
+  .fragile-bar-track {
+    height: 4px;
+    background: var(--border2);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .fragile-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent4), var(--fragile));
+    border-radius: 2px;
+    transition: width 0.5s ease;
+    width: 0%;
+  }
+
+  .fragile-narrative {
+    font-size: 0.56rem;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.5;
+    transition: color 0.3s;
+  }
+  .fragile-narrative.active { color: var(--muted2); }
+
+  /* Threshold crossings */
+  .threshold-line {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 1px;
+    background: var(--fragile);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .threshold-line.visible { opacity: 0.4; }
+
+  /* ── ITCV slope panel in right sidebar ── */
+  .slope-panel {
+    background: var(--surface-a);
+    border: 1px solid var(--border);
+    padding: 11px;
+    margin-top: 6px;
+    display: none;
+  }
+  .slope-panel.visible { display: block; }
+
+  .slope-canvas-wrap { height: 60px; margin-top: 8px; position: relative; }
+
+  /* Transition flash on zero crossing */
+  .flash-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255,58,74,0.0);
+    pointer-events: none;
+    transition: background 0.15s;
+  }
+  .flash-overlay.flash { background: rgba(255,58,74,0.08); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+<!-- ── HEADER ── -->
+<header class="header">
+  <div class="logo">panel<span>Surface</span></div>
+  <div class="badge badge-teal">prototype</div>
+  <div class="badge badge-purple">+ITCV</div>
+  <div class="badge badge-warn">v0.2.0</div>
+  <div class="header-right">
+    <span style="color:var(--muted);font-size:0.6rem;font-style:italic">f(SES,t) · ∂f/∂SES · ∂²f/∂SES∂t · ITCV sensitivity</span>
+    <div class="itcv-mode-indicator" id="itcvIndicator">
+      <div class="itcv-dot"></div>
+      <span id="itcvIndicatorText">ITCV OFF</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── LEFT CONTROLS ── -->
+<aside class="controls">
+  <div class="sec">Surface Model</div>
+
+  <div class="math-block">
+    <div class="eq">f(SES,t) = α·SES + β·t + γ·SES·t + δ·SES²</div>
+    <div class="comment">// + sinusoidal nonlinearity</div>
+  </div>
+
+  <div class="ctrl">
+    <label>SES gradient (α) <span class="val" id="alphaVal">0.42</span></label>
+    <input type="range" id="alpha" min="-1" max="1" step="0.01" value="0.42">
+  </div>
+  <div class="ctrl">
+    <label>Time trend (β) <span class="val" id="betaVal">0.18</span></label>
+    <input type="range" id="beta" min="-1" max="1" step="0.01" value="0.18">
+  </div>
+  <div class="ctrl">
+    <label>Interaction (γ) <span class="val" id="gammaVal">0.31</span></label>
+    <input type="range" id="gamma" min="-1" max="1" step="0.01" value="0.31">
+  </div>
+  <div class="ctrl">
+    <label>Curvature (δ) <span class="val" id="deltaVal">0.20</span></label>
+    <input type="range" id="delta" min="0" max="1" step="0.01" value="0.20">
+  </div>
+
+  <div class="sec">Probe Point</div>
+  <div class="ctrl">
+    <label>SES level <span class="val" id="sesVal">0.50</span></label>
+    <input type="range" id="sesProbe" min="0.02" max="0.98" step="0.01" value="0.50">
+  </div>
+  <div class="ctrl">
+    <label>Time (t) <span class="val" id="tVal">0.50</span></label>
+    <input type="range" id="tProbe" min="0.02" max="0.98" step="0.01" value="0.50">
+  </div>
+
+  <div class="sec">Overlays</div>
+  <div class="trow">
+    <span>∂f/∂SES gradient field</span>
+    <label class="tog"><input type="checkbox" id="togSES" checked><span class="tog-track"></span></label>
+  </div>
+  <div class="trow">
+    <span>Inequality mass bands</span>
+    <label class="tog"><input type="checkbox" id="togMass" checked><span class="tog-track"></span></label>
+  </div>
+  <div class="trow">
+    <span>Wireframe</span>
+    <label class="tog"><input type="checkbox" id="togWire"><span class="tog-track"></span></label>
+  </div>
+  <div class="trow itcv-toggle">
+    <span>🔬 ITCV fragile zones</span>
+    <label class="tog itcv-tog"><input type="checkbox" id="togITCV"><span class="tog-track"></span></label>
+  </div>
+
+  <div class="sec">ITCV — Confound Strength</div>
+
+  <div class="math-block itcv">
+    <div class="eq">r_confound = r(U→SES) · r(U→outcome)</div>
+    <div class="comment">// drag to watch adjusted slope cross 0</div>
+  </div>
+
+  <div class="confound-section disabled" id="confoundSection">
+    <div class="confound-label">r(U→SES) — confounder corr. with SES</div>
+    <div class="ctrl">
+      <label>r_SES <span class="val" id="rSESVal">0.00</span></label>
+      <input type="range" class="itcv-slider" id="rSES" min="0" max="0.8" step="0.01" value="0">
+    </div>
+    <div class="confound-label">r(U→outcome) — confounder corr. with f</div>
+    <div class="ctrl">
+      <label>r_outcome <span class="val" id="rOutcomeVal">0.00</span></label>
+      <input type="range" class="itcv-slider" id="rOutcome" min="0" max="0.8" step="0.01" value="0">
+    </div>
+    <div style="margin-top:8px">
+      <div style="font-size:0.55rem;color:var(--muted);margin-bottom:4px">Combined confound impact</div>
+      <div style="height:4px;background:var(--border2);border-radius:2px;overflow:hidden">
+        <div id="confoundBar" style="height:100%;background:linear-gradient(90deg,var(--accent4),var(--fragile));width:0%;transition:width 0.2s;border-radius:2px"></div>
+      </div>
+      <div id="confoundVal" style="font-size:0.6rem;color:var(--accent4);margin-top:4px;font-style:italic">r_combined = 0.000</div>
+    </div>
+    <div class="ctrl" style="margin-top:10px">
+      <label>ITCV fragile threshold <span class="val" id="itcvThreshVal">0.15</span></label>
+      <input type="range" class="fragile-slider" id="itcvThresh" min="0.05" max="0.50" step="0.01" value="0.15">
+    </div>
+  </div>
+
+</aside>
+
+<!-- ── CENTER CANVAS ── -->
+<main class="canvas-wrapper" id="canvasWrapper">
+  <canvas id="threeCanvas"></canvas>
+  <div class="flash-overlay" id="flashOverlay"></div>
+
+  <div class="probe-hud" id="probeHud">
+    <div>SES = <span class="val" id="info_ses">0.50</span></div>
+    <div>t &nbsp;= <span class="val" id="info_t">0.50</span></div>
+    <div>f(SES,t) = <span class="val" id="info_f">—</span></div>
+    <div id="itcv_hud" style="display:none;margin-top:4px;border-top:1px solid var(--border2);padding-top:4px">
+      <div>r_impact = <span class="itcv-val" id="info_rimpact">—</span></div>
+      <div>adj.slope = <span id="info_adjslope" class="itcv-val">—</span></div>
+      <div>status = <span id="info_status">—</span></div>
+    </div>
+  </div>
+
+  <div class="slope-zero-line" id="zeroCrossWarn">
+    <div id="zeroCrossMsg">—</div>
+  </div>
+
+  <div class="canvas-overlay">
+    <div class="leg"><div class="leg-dot" style="background:var(--accent)"></div> f(SES,t)</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--accent2)"></div> probe</div>
+    <div class="leg"><div class="leg-dot" style="background:var(--accent3)"></div> mass bands</div>
+    <div class="leg" id="fragile-legend" style="display:none">
+      <div class="leg-dot" style="background:var(--fragile)"></div> fragile zones
+    </div>
+  </div>
+</main>
+
+<!-- ── RIGHT PANEL ── -->
+<aside class="derivatives">
+  <div class="sec">Partial Derivatives at Probe</div>
+
+  <div class="dcard dc1" id="card_dSES">
+    <div class="dname">SES gradient</div>
+    <div class="deq">∂f / ∂SES</div>
+    <div class="dval pos" id="dSES">+0.000</div>
+    <div class="dbar"><div class="dfill" id="dSES_bar" style="background:var(--accent)"></div></div>
+
+    <!-- Adjusted slope bar (ITCV) -->
+    <div class="adj-bar-wrap" id="adjBarWrap">
+      <div class="adj-bar-label">
+        <span style="color:var(--accent4)">adj. slope (after confound)</span>
+        <span id="adjSlopeLabel">—</span>
+      </div>
+      <div class="adj-bar-track">
+        <div class="adj-bar-fill" id="adjBarFill"></div>
+        <div class="adj-zero-marker" id="adjZeroMarker" style="left:50%"></div>
+      </div>
+    </div>
+
+    <div class="interp" id="dSES_interp">—</div>
+  </div>
+
+  <div class="dcard dc2">
+    <div class="dname">Time trend</div>
+    <div class="deq">∂f / ∂t</div>
+    <div class="dval pos" id="dT">+0.000</div>
+    <div class="dbar"><div class="dfill" id="dT_bar" style="background:var(--accent2)"></div></div>
+    <div class="interp" id="dT_interp">—</div>
+  </div>
+
+  <div class="dcard dc3">
+    <div class="dname">Cross-partial (divergence)</div>
+    <div class="deq">∂²f / ∂SES∂t</div>
+    <div class="dval pos" id="dCross">+0.000</div>
+    <div class="dbar"><div class="dfill" id="dCross_bar" style="background:var(--accent3)"></div></div>
+    <div class="interp" id="dCross_interp">—</div>
+  </div>
+
+  <!-- ITCV card — shown when ITCV is on -->
+  <div class="itcv-card dc4" id="itcvCard">
+    <div class="dname" style="color:var(--accent4)">ITCV at probe</div>
+    <div class="deq" style="color:var(--accent4)">r_impact threshold</div>
+    <div class="dval" id="itcv_rimpact">—</div>
+    <div class="dbar" style="margin-top:7px">
+      <div class="dfill" id="itcv_bar" style="background:var(--accent4)"></div>
+    </div>
+    <div id="itcv_badge" class="robust-badge rb-robust" style="margin-top:6px">—</div>
+    <div class="interp" id="itcv_interp">Enable ITCV to see robustness.</div>
+
+    <div class="slope-panel visible" id="slopePanel" style="display:block;margin-top:8px">
+      <div style="font-size:0.55rem;color:var(--muted);margin-bottom:4px">Adjusted slope vs. confound strength</div>
+      <div class="slope-canvas-wrap">
+        <canvas id="slopeCanvas" style="width:100%;height:60px"></canvas>
+      </div>
+      <div style="font-size:0.54rem;color:var(--muted);margin-top:4px;font-style:italic" id="slopeNarrative">
+        Drag r_SES / r_outcome to see slope nullification.
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">Surface Curvature</div>
+  <div class="dcard" style="border-color:var(--border)">
+    <div class="dname">∂²f / ∂SES²</div>
+    <div class="dval" id="d2SES" style="color:var(--text);font-size:0.95rem">0.000</div>
+    <div class="interp" id="d2SES_interp">—</div>
+  </div>
+  <div class="dcard" style="border-color:var(--border)">
+    <div class="dname">∂²f / ∂t²</div>
+    <div class="dval" id="d2T" style="color:var(--text);font-size:0.95rem">0.000</div>
+    <div class="interp" id="d2T_interp">—</div>
+  </div>
+</aside>
+
+<!-- ── BOTTOM STRIP ── -->
+<div class="bottom-strip">
+
+  <div class="strip-panel">
+    <div class="strip-title">Total Inequality Mass</div>
+    <div class="integral-value" id="totalMass">—</div>
+    <div class="mini-chart"><canvas class="mini" id="miniMass"></canvas></div>
+    <div class="iinterp">∫∫ f(SES,t) dSES dt — full domain mass</div>
+  </div>
+
+  <div class="strip-panel">
+    <div class="strip-title">SES Gap at t (probe)</div>
+    <div class="integral-value" style="color:var(--accent)" id="sesGap">—</div>
+    <div class="mini-chart"><canvas class="mini" id="miniSES"></canvas></div>
+    <div class="iinterp">∫ f(SES,t₀) dSES — cross-section at probe t</div>
+  </div>
+
+  <div class="strip-panel">
+    <div class="strip-title">Divergence Index</div>
+    <div class="integral-value" style="color:var(--accent3)" id="divergIdx">—</div>
+    <div class="mini-chart"><canvas class="mini" id="miniDiv"></canvas></div>
+    <div class="iinterp">∫ |∂f/∂SES| dt — slope variation over waves</div>
+  </div>
+
+  <div class="strip-panel">
+    <div class="strip-title">Trend at SES (probe)</div>
+    <div class="integral-value" style="color:var(--accent2)" id="trendMass">—</div>
+    <div class="mini-chart"><canvas class="mini" id="miniT"></canvas></div>
+    <div class="iinterp">∫ f(SES₀,t) dt — trajectory for fixed SES stratum</div>
+  </div>
+
+  <div class="fragile-mass-panel" id="fragileMassPanel">
+    <div class="strip-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Fragile Mass</span>
+      <span style="font-size:0.5rem;color:var(--accent4);font-style:italic" id="fragileMassItcvNote">ITCV OFF</span>
+    </div>
+    <div class="fragile-mass-value" id="fragileMassValue">—</div>
+    <div class="fragile-bar-track">
+      <div class="fragile-bar-fill" id="fragileMassBar"></div>
+    </div>
+    <div class="fragile-narrative" id="fragileMassNarrative">
+      Enable ITCV overlay to compute fragile mass — the proportion of the inequality surface where
+      the estimated SES gradient could be nullified by a confounder with r &lt; threshold.
+    </div>
+    <div class="threshold-line" id="threshLine"></div>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let params   = { alpha: 0.42, beta: 0.18, gamma: 0.31, delta: 0.20 };
+let probe    = { ses: 0.5, t: 0.5 };
+let overlays = { ses: true, mass: true, wire: false, itcv: false };
+let itcvState = {
+  rSES:     0,
+  rOutcome: 0,
+  threshold: 0.15,
+  enabled:   false,
+  prevAdjSlope: null,
+};
+
+// ═══════════════════════════════════════════════════════════
+// SURFACE MATH
+// ═══════════════════════════════════════════════════════════
+function f(ses, t) {
+  const a = params.alpha, b = params.beta, g = params.gamma, d = params.delta;
+  return a * ses + b * t + g * ses * t
+    + d * ses * ses * 0.4
+    - d * t * t * 0.3
+    + 0.1 * Math.sin(ses * Math.PI * 1.5)
+    - 0.08 * Math.cos(t * Math.PI);
+}
+
+const H = 0.001, H2 = 0.002;
+const dF_dSES    = (s,t) => (f(s+H,t) - f(s-H,t)) / (2*H);
+const dF_dT      = (s,t) => (f(s,t+H) - f(s,t-H)) / (2*H);
+const d2F_dSESdT = (s,t) => (f(s+H2,t+H2)-f(s+H2,t-H2)-f(s-H2,t+H2)+f(s-H2,t-H2))/(4*H2*H2);
+const d2F_dSES2  = (s,t) => (f(s+H2,t) - 2*f(s,t) + f(s-H2,t)) / (H2*H2);
+const d2F_dT2    = (s,t) => (f(s,t+H2) - 2*f(s,t) + f(s,t-H2)) / (H2*H2);
+
+// ═══════════════════════════════════════════════════════════
+// ITCV MATH
+// ═══════════════════════════════════════════════════════════
+// Local effective n at probe (proxy: fixed 200 for demo)
+const LOCAL_N_EFF = 200;
+const N_COV = 2;
+
+function computeITCV(slope, nEff) {
+  const df = Math.max(nEff - N_COV - 1, 1);
+  const se = Math.abs(slope) / Math.sqrt(df) * 2; // proxy SE
+  if (se < 1e-10) return { itcv: 0, rImpact: 0, tStat: 0, df };
+  const tStat = slope / se;
+  const r2partial = tStat**2 / (tStat**2 + df);
+  const tCrit = 1.96; // approx
+  const r2crit = tCrit**2 / (tCrit**2 + df);
+  const itcv = r2partial - r2crit;
+  const rImpact = Math.sign(itcv) * Math.sqrt(Math.abs(itcv));
+  return { itcv, rImpact, tStat, df, r2partial, r2crit };
+}
+
+// Adjusted slope after confounding: bias = r_SES * r_outcome * SD_Y / SD_X (simplified)
+// Using Frank's formula: adj_slope = slope - r_combined * |slope|
+function adjustedSlope(rawSlope, rSES, rOutcome) {
+  const rCombined = rSES * rOutcome;
+  return rawSlope - Math.sign(rawSlope) * rCombined * Math.abs(rawSlope) * 3.5;
+}
+
+// r_impact at arbitrary (ses,t) — varies with local gradient
+function rImpactAt(ses, t) {
+  const slope = dF_dSES(ses, t);
+  const res = computeITCV(slope, LOCAL_N_EFF);
+  return res.rImpact;
+}
+
+// Is a cell fragile? r_impact < threshold
+function isCellFragile(ses, t) {
+  return Math.abs(rImpactAt(ses, t)) < itcvState.threshold;
+}
+
+// Fragile mass = proportion of (SES,t) cells where r_impact < threshold
+function computeFragileMass(ngrid = 20) {
+  if (!itcvState.enabled) return null;
+  let fragile = 0, total = 0;
+  for (let i = 0; i < ngrid; i++) {
+    for (let j = 0; j < ngrid; j++) {
+      const ses = (i + 0.5) / ngrid;
+      const t   = (j + 0.5) / ngrid;
+      total++;
+      if (isCellFragile(ses, t)) fragile++;
+    }
+  }
+  return fragile / total;
+}
+
+// ═══════════════════════════════════════════════════════════
+// THREE.JS SETUP
+// ═══════════════════════════════════════════════════════════
+const wrapper = document.getElementById('canvasWrapper');
+const canvas3 = document.getElementById('threeCanvas');
+const renderer = new THREE.WebGLRenderer({ canvas: canvas3, antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x06070f);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100);
+camera.position.set(2.2, 1.8, 2.5);
+camera.lookAt(0, 0, 0);
+
+let isDragging = false, lastMouse = { x: 0, y: 0 };
+let spherical = { theta: Math.PI / 4, phi: Math.PI / 3.5, r: 3.5 };
+
+canvas3.addEventListener('mousedown', e => { isDragging = true; lastMouse = { x: e.clientX, y: e.clientY }; });
+window.addEventListener('mouseup', () => isDragging = false);
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = (e.clientX - lastMouse.x) * 0.005;
+  const dy = (e.clientY - lastMouse.y) * 0.005;
+  spherical.theta -= dx;
+  spherical.phi = Math.max(0.1, Math.min(Math.PI * 0.48, spherical.phi + dy));
+  lastMouse = { x: e.clientX, y: e.clientY };
+});
+canvas3.addEventListener('wheel', e => {
+  spherical.r = Math.max(2, Math.min(7, spherical.r + e.deltaY * 0.003));
+  e.preventDefault();
+}, { passive: false });
+
+function updateCamera() {
+  camera.position.x = spherical.r * Math.sin(spherical.phi) * Math.sin(spherical.theta);
+  camera.position.y = spherical.r * Math.cos(spherical.phi);
+  camera.position.z = spherical.r * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+  camera.lookAt(0, 0, 0);
+}
+
+// Lighting
+scene.add(new THREE.AmbientLight(0x8899bb, 0.55));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(2, 4, 2);
+scene.add(dirLight);
+
+// Axes
+function addAxis(from, to, color) {
+  const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...from), new THREE.Vector3(...to)]);
+  scene.add(new THREE.Line(geo, new THREE.LineBasicMaterial({ color })));
+}
+addAxis([-0.55,-0.35,-0.55],[0.6,-0.35,-0.55], 0x4fd1b8);
+addAxis([-0.55,-0.35,-0.55],[-0.55,0.6,-0.55], 0x777799);
+addAxis([-0.55,-0.35,-0.55],[-0.55,-0.35,0.6], 0xff5c6e);
+
+// ═══════════════════════════════════════════════════════════
+// COLOR MAPS
+// ═══════════════════════════════════════════════════════════
+function colorSurface(norm) {
+  if (norm < 0.5) {
+    const t = norm * 2;
+    return new THREE.Color(
+      0.31*t + 0.07*(1-t), 0.82*t + 0.50*(1-t), 0.72*t + 0.85*(1-t));
+  } else {
+    const t = (norm - 0.5) * 2;
+    return new THREE.Color(
+      0.96*t + 0.31*(1-t), 0.36*t + 0.82*(1-t), 0.17*t + 0.72*(1-t));
+  }
+}
+
+function colorITCV(rImpact, threshold) {
+  // fragile → red, moderate → amber, robust → green
+  if (rImpact < 0) return new THREE.Color(0.7, 0.1, 0.15);
+  if (rImpact < threshold) {
+    const t = rImpact / threshold;
+    return new THREE.Color(0.9, 0.15 + t*0.4, 0.1);
+  }
+  if (rImpact < threshold * 2.5) {
+    const t = (rImpact - threshold) / (threshold * 1.5);
+    return new THREE.Color(0.9 - t*0.5, 0.55 + t*0.25, 0.1 + t*0.1);
+  }
+  return new THREE.Color(0.13, 0.78, 0.54);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SURFACE MESH
+// ═══════════════════════════════════════════════════════════
+const NGRID = 42;
+let surfaceMesh, wireMesh, probeMesh, massBands = [], probeRing;
+
+function buildSurface() {
+  [surfaceMesh, wireMesh].forEach(m => m && scene.remove(m));
+  massBands.forEach(b => scene.remove(b));
+  massBands = [];
+  if (probeRing) scene.remove(probeRing);
+
+  const geo = new THREE.BufferGeometry();
+  const pos = [], col = [], idx = [];
+
+  let minF = Infinity, maxF = -Infinity;
+  const fGrid = [];
+  for (let i = 0; i <= NGRID; i++) {
+    fGrid[i] = [];
+    for (let j = 0; j <= NGRID; j++) {
+      const fv = f(i/NGRID, j/NGRID);
+      fGrid[i][j] = fv;
+      if (fv < minF) minF = fv;
+      if (fv > maxF) maxF = fv;
+    }
+  }
+  const fRange = maxF - minF || 1;
+
+  for (let i = 0; i <= NGRID; i++) {
+    for (let j = 0; j <= NGRID; j++) {
+      const ses = i/NGRID, t = j/NGRID;
+      const fv = fGrid[i][j];
+      const norm = (fv - minF) / fRange;
+      pos.push(ses - 0.5, fv * 0.7, t - 0.5);
+
+      let c;
+      if (itcvState.enabled) {
+        const ri = rImpactAt(ses, t);
+        c = colorITCV(ri, itcvState.threshold);
+        // blend: itcv color 70% + surface color 30%
+        const cs = colorSurface(norm);
+        c.r = c.r * 0.7 + cs.r * 0.3;
+        c.g = c.g * 0.7 + cs.g * 0.3;
+        c.b = c.b * 0.7 + cs.b * 0.3;
+      } else {
+        c = colorSurface(norm);
+      }
+      col.push(c.r, c.g, c.b);
+    }
+  }
+
+  for (let i = 0; i < NGRID; i++) {
+    for (let j = 0; j < NGRID; j++) {
+      const a = i*(NGRID+1)+j, b2=a+1, c2=a+(NGRID+1), d2=c2+1;
+      idx.push(a,b2,c2, b2,d2,c2);
+    }
+  }
+
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color',    new THREE.Float32BufferAttribute(col, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+
+  surfaceMesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
+    vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.9
+  }));
+  scene.add(surfaceMesh);
+
+  const wireGeo = new THREE.WireframeGeometry(geo);
+  wireMesh = new THREE.LineSegments(wireGeo, new THREE.LineBasicMaterial({
+    color: 0x1a1d30, transparent: true, opacity: 0.25
+  }));
+  wireMesh.visible = overlays.wire;
+  scene.add(wireMesh);
+
+  // Mass bands
+  if (overlays.mass) {
+    const quintiles = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
+    const massColors = [0x1e4a40, 0x2a6055, 0x3a7868, 0x4a9078, 0x5ba88a];
+    for (let q = 0; q < 5; q++) {
+      const sc = (quintiles[q] + quintiles[q+1]) / 2;
+      const bandGeo = new THREE.BufferGeometry();
+      const bpos = [], bind = [];
+      for (let j = 0; j <= NGRID; j++) {
+        const t = j/NGRID;
+        const y0 = -0.5, y1 = f(sc, t) * 0.7;
+        bpos.push(sc-0.5, y0, t-0.5, sc-0.5, y1, t-0.5);
+      }
+      bandGeo.setAttribute('position', new THREE.Float32BufferAttribute(bpos, 3));
+      for (let j = 0; j < NGRID; j++) {
+        const a=j*2, b2=a+1, c2=a+2, d2=a+3;
+        bind.push(a,b2,c2, b2,d2,c2);
+      }
+      bandGeo.setIndex(bind);
+      const band = new THREE.Mesh(bandGeo, new THREE.MeshBasicMaterial({
+        color: massColors[q], transparent: true, opacity: 0.08, side: THREE.DoubleSide
+      }));
+      scene.add(band);
+      massBands.push(band);
+    }
+  }
+
+  // Probe sphere
+  if (probeMesh) scene.remove(probeMesh);
+  const probeGeo = new THREE.SphereGeometry(0.027, 16, 16);
+  const probeMat = new THREE.MeshBasicMaterial({ color: 0xff5c6e });
+  probeMesh = new THREE.Mesh(probeGeo, probeMat);
+  updateProbe();
+  scene.add(probeMesh);
+
+  updateDerivatives();
+  updateIntegrals();
+  updateITCVPanel();
+}
+
+function updateProbe() {
+  if (!probeMesh) return;
+  const fv = f(probe.ses, probe.t);
+  probeMesh.position.set(probe.ses-0.5, fv*0.7, probe.t-0.5);
+  document.getElementById('info_ses').textContent = probe.ses.toFixed(2);
+  document.getElementById('info_t').textContent   = probe.t.toFixed(2);
+  document.getElementById('info_f').textContent   = fv.toFixed(3);
+}
+
+// ═══════════════════════════════════════════════════════════
+// DERIVATIVES PANEL
+// ═══════════════════════════════════════════════════════════
+function fmt(v) { return (v>=0?'+':'')+v.toFixed(3); }
+
+function updateDerivatives() {
+  const s = probe.ses, t = probe.t;
+  const ds = dF_dSES(s,t), dt = dF_dT(s,t), dc = d2F_dSESdT(s,t);
+  const d2s = d2F_dSES2(s,t), d2t = d2F_dT2(s,t);
+
+  const setD = (vid, bid, interpId, val, maxV, col, interpFn) => {
+    const el = document.getElementById(vid);
+    el.textContent = fmt(val);
+    el.className = 'dval ' + (val>=0?'pos':'neg');
+    document.getElementById(bid).style.width  = Math.min(100, Math.abs(val)/maxV*100)+'%';
+    document.getElementById(bid).style.background = col;
+    document.getElementById(interpId).textContent = interpFn(val);
+  };
+
+  setD('dSES','dSES_bar','dSES_interp', ds, 1.5, 'var(--accent)',
+    v => v>0.3  ? 'Strong SES gradient — outcome rises sharply with status.'
+       : v>0.05 ? 'Moderate SES slope — gap present but compressed.'
+       : v>-0.05? 'Flat SES gradient — near-zero inequality at this wave.'
+       :          'Reversed SES slope — unusual, check model fit.');
+
+  setD('dT','dT_bar','dT_interp', dt, 1.0, 'var(--accent2)',
+    v => v>0.15  ? 'Rising trend — outcomes improving over time at this SES.'
+       : v<-0.15 ? 'Declining trend — deterioration at this stratum.'
+       :           'Flat temporal trend — stable stratum over waves.');
+
+  setD('dCross','dCross_bar','dCross_interp', dc, 0.8, 'var(--accent3)',
+    v => Math.abs(v)>0.2 ? (v>0
+           ? 'Divergence: SES gap widening over time (inequality steepening).'
+           : 'Convergence: SES gap closing across waves.')
+       : 'Parallel trends — SES gaps stable across waves.');
+
+  document.getElementById('d2SES').textContent = fmt(d2s);
+  document.getElementById('d2SES_interp').textContent =
+    d2s>0.05  ? 'Convex in SES — accelerating returns at top.'
+  : d2s<-0.05 ? 'Concave in SES — diminishing returns at higher strata.'
+  :             'Linear in SES — constant gradient across quintiles.';
+
+  document.getElementById('d2T').textContent = fmt(d2t);
+  document.getElementById('d2T_interp').textContent =
+    d2t>0.05  ? 'Accelerating trend (positive curvature).'
+  : d2t<-0.05 ? 'Decelerating trend (diminishing returns over time).'
+  :             'Linear time trend at this SES level.';
+
+  // Adjusted slope + zero crossing
+  if (itcvState.enabled) {
+    const rawSlope = ds;
+    const adjSlope = adjustedSlope(rawSlope, itcvState.rSES, itcvState.rOutcome);
+    updateAdjSlopeBar(rawSlope, adjSlope);
+    checkZeroCrossing(rawSlope, adjSlope);
+    updateITCVHud(adjSlope);
+  }
+}
+
+function updateAdjSlopeBar(rawSlope, adjSlope) {
+  const wrap = document.getElementById('adjBarWrap');
+  if (!itcvState.enabled) { wrap.classList.remove('visible'); return; }
+  wrap.classList.add('visible');
+
+  document.getElementById('adjSlopeLabel').textContent = fmt(adjSlope);
+  document.getElementById('adjSlopeLabel').style.color =
+    Math.abs(adjSlope) < 0.03 ? 'var(--fragile)' : 'var(--accent4)';
+
+  // Bar: 0–100%, midpoint = rawSlope magnitude
+  const maxVal = Math.max(Math.abs(rawSlope) * 1.5, 0.1);
+  const adjPct = Math.max(0, Math.min(100, Math.abs(adjSlope) / maxVal * 100));
+  const rawPct = Math.min(100, Math.abs(rawSlope) / maxVal * 100);
+
+  const fill = document.getElementById('adjBarFill');
+  fill.style.width    = adjPct + '%';
+  fill.style.background = adjSlope < 0.03 && adjSlope > -0.03
+    ? 'var(--fragile)'
+    : adjSlope < rawSlope * 0.5
+    ? 'var(--warn)'
+    : 'var(--accent4)';
+
+  // Zero marker at rawSlope / maxVal position (represents where null = 0 is)
+  document.getElementById('adjZeroMarker').style.left = '0%';
+}
+
+function checkZeroCrossing(rawSlope, adjSlope) {
+  const wasNeg = itcvState.prevAdjSlope !== null && itcvState.prevAdjSlope > 0 && adjSlope <= 0;
+  const wasPos = itcvState.prevAdjSlope !== null && itcvState.prevAdjSlope < 0 && adjSlope >= 0;
+  itcvState.prevAdjSlope = adjSlope;
+
+  const el = document.getElementById('zeroCrossWarn');
+  const nearZero = Math.abs(adjSlope) < 0.04;
+
+  if (nearZero || wasNeg || wasPos) {
+    el.classList.add('visible');
+    if (wasNeg || wasPos) {
+      el.innerHTML = '<div class="zero-warn">⚠ SLOPE NULLIFIED — adjusted slope crossed zero</div><div style="font-size:0.55rem;color:var(--muted);margin-top:3px">Confounder at current r_SES × r_outcome can explain away the SES gradient.</div>';
+      const flash = document.getElementById('flashOverlay');
+      flash.classList.add('flash');
+      setTimeout(() => flash.classList.remove('flash'), 300);
+    } else {
+      el.innerHTML = `<div class="zero-ok">adj. slope = ${adjSlope.toFixed(4)} — approaching zero</div><div style="font-size:0.55rem;color:var(--muted);margin-top:3px">Confound close to nullification threshold.</div>`;
+    }
+  } else {
+    el.classList.remove('visible');
+  }
+
+  // Update dSES card border
+  const card = document.getElementById('card_dSES');
+  if (nearZero) card.classList.add('fragile');
+  else card.classList.remove('fragile');
+}
+
+function updateITCVHud(adjSlope) {
+  const ri = rImpactAt(probe.ses, probe.t);
+  const rCombined = itcvState.rSES * itcvState.rOutcome;
+  document.getElementById('info_rimpact').textContent = ri.toFixed(4);
+  document.getElementById('info_adjslope').textContent = adjSlope.toFixed(4);
+  document.getElementById('info_adjslope').className =
+    Math.abs(adjSlope) < 0.03 ? 'fragile-val' : 'itcv-val';
+  const status = document.getElementById('info_status');
+  if (rCombined > Math.abs(ri)) {
+    status.textContent = 'NULLIFIED';
+    status.style.color = 'var(--fragile)';
+  } else if (rCombined > Math.abs(ri) * 0.6) {
+    status.textContent = 'approaching';
+    status.style.color = 'var(--warn)';
+  } else {
+    status.textContent = ri > 0.3 ? 'robust' : ri > 0.15 ? 'moderate' : 'fragile';
+    status.style.color = ri > 0.3 ? 'var(--robust)' : ri > 0.15 ? 'var(--warn)' : 'var(--fragile)';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ITCV PANEL
+// ═══════════════════════════════════════════════════════════
+function updateITCVPanel() {
+  const card = document.getElementById('itcvCard');
+  card.classList.toggle('visible', itcvState.enabled);
+  document.getElementById('itcv_hud').style.display = itcvState.enabled ? '' : 'none';
+  document.getElementById('adjBarWrap').classList.toggle('visible', itcvState.enabled);
+  document.getElementById('fragile-legend').style.display = itcvState.enabled ? '' : 'none';
+
+  if (!itcvState.enabled) {
+    document.getElementById('fragileMassValue').textContent = '—';
+    document.getElementById('fragileMassValue').classList.remove('active');
+    document.getElementById('fragileMassPanel').classList.remove('active');
+    document.getElementById('fragileMassBar').style.width = '0%';
+    document.getElementById('fragileMassItcvNote').textContent = 'ITCV OFF';
+    document.getElementById('fragileMassNarrative').classList.remove('active');
+    return;
+  }
+
+  const slope = dF_dSES(probe.ses, probe.t);
+  const res   = computeITCV(slope, LOCAL_N_EFF);
+  const ri    = res.rImpact;
+
+  document.getElementById('itcv_rimpact').textContent = ri.toFixed(4);
+  document.getElementById('itcv_bar').style.width = Math.min(100, Math.abs(ri) * 200) + '%';
+  document.getElementById('itcv_bar').style.background =
+    ri < 0.1 ? 'var(--fragile)' : ri < 0.25 ? 'var(--warn)' : 'var(--accent4)';
+
+  const badge = document.getElementById('itcv_badge');
+  if (ri < itcvState.threshold) {
+    badge.textContent = '⚠ FRAGILE'; badge.className = 'robust-badge rb-fragile';
+  } else if (ri < 0.3) {
+    badge.textContent = '◦ MODERATE'; badge.className = 'robust-badge rb-moderate';
+  } else {
+    badge.textContent = '✓ ROBUST'; badge.className = 'robust-badge rb-robust';
+  }
+
+  const rCombined = itcvState.rSES * itcvState.rOutcome;
+  document.getElementById('itcv_interp').textContent =
+    `r_impact = ${ri.toFixed(3)}. An unmeasured confounder needs r ≥ ${ri.toFixed(3)} to nullify the local SES gradient. Current confound = ${rCombined.toFixed(3)}.`;
+
+  // Fragile mass
+  const fm = computeFragileMass(18);
+  const fmPct = (fm * 100).toFixed(1);
+  document.getElementById('fragileMassValue').textContent = fmPct + '%';
+  document.getElementById('fragileMassValue').classList.toggle('active', fm > 0.05);
+  document.getElementById('fragileMassPanel').classList.toggle('active', fm > 0.2);
+  document.getElementById('fragileMassBar').style.width = (fm * 100) + '%';
+  document.getElementById('fragileMassItcvNote').textContent = `threshold r < ${itcvState.threshold.toFixed(2)}`;
+  document.getElementById('fragileMassNarrative').classList.toggle('active', fm > 0.05);
+  document.getElementById('fragileMassNarrative').textContent =
+    fm < 0.05 ? `Only ${fmPct}% of the surface is fragile — the SES gradient is robust across most of the (SES,t) domain.`
+  : fm < 0.3  ? `${fmPct}% of the surface is fragile to a confounder with r < ${itcvState.threshold.toFixed(2)}. Moderate caution warranted in those zones.`
+  :             `⚠ ${fmPct}% of the surface is fragile — a substantial portion of the inequality estimate is sensitive to unmeasured confounding at r < ${itcvState.threshold.toFixed(2)}.`;
+
+  // Update slope chart
+  drawSlopeChart();
+
+  document.getElementById('itcvIndicator').classList.add('on');
+  document.getElementById('itcvIndicatorText').textContent = 'ITCV ON';
+}
+
+// ═══════════════════════════════════════════════════════════
+// SLOPE CHART (adjusted slope as fn of confound strength)
+// ═══════════════════════════════════════════════════════════
+function drawSlopeChart() {
+  const cvs = document.getElementById('slopeCanvas');
+  if (!cvs) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = cvs.offsetWidth || 220;
+  const H = cvs.offsetHeight || 60;
+  cvs.width = W * dpr; cvs.height = H * dpr;
+  const ctx = cvs.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const rawSlope = dF_dSES(probe.ses, probe.t);
+  const M = 60;
+  const rMax = 0.8;
+  const slopes = Array.from({length: M}, (_,i) => {
+    const r = i / (M-1) * rMax;
+    return adjustedSlope(rawSlope, r, r); // symmetric: r_SES = r_outcome = r
+  });
+
+  const minS = Math.min(...slopes, -0.05);
+  const maxS = Math.max(...slopes, 0.05);
+  const range = maxS - minS || 0.1;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Zero line
+  const y0 = H - ((-minS) / range) * H * 0.88 - H * 0.06;
+  ctx.setLineDash([3,3]);
+  ctx.strokeStyle = 'rgba(255,58,74,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(W, y0); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Current confound position
+  const curR = Math.min(itcvState.rSES, itcvState.rOutcome);
+  const xCur = (curR / rMax) * W;
+  ctx.strokeStyle = 'rgba(167,139,250,0.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xCur, 0); ctx.lineTo(xCur, H); ctx.stroke();
+
+  // Fill
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  slopes.forEach((v,i) => {
+    const x = (i/(M-1))*W;
+    const y = H - ((v-minS)/range)*H*0.88 - H*0.06;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.lineTo(W, H); ctx.closePath();
+  ctx.fillStyle = 'rgba(79,209,184,0.08)';
+  ctx.fill();
+
+  // Line (color by sign)
+  slopes.forEach((v,i) => {
+    if (i===0) return;
+    const x1 = ((i-1)/(M-1))*W, y1 = H-((slopes[i-1]-minS)/range)*H*0.88-H*0.06;
+    const x2 = (i/(M-1))*W,     y2 = H-((v-minS)/range)*H*0.88-H*0.06;
+    ctx.beginPath();
+    ctx.strokeStyle = v < 0.01 ? '#ff5c6e' : v < rawSlope*0.5 ? '#f5c842' : '#4fd1b8';
+    ctx.lineWidth = 1.5;
+    ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  });
+
+  // Labels
+  ctx.font = '8px DM Mono, monospace';
+  ctx.fillStyle = 'rgba(74,78,106,0.9)';
+  ctx.fillText('0', 2, y0 - 2);
+  ctx.fillText('r_confound →', W - 68, H - 2);
+
+  // Narrative
+  const adjAtCur = adjustedSlope(rawSlope, itcvState.rSES, itcvState.rOutcome);
+  const pctDrop = rawSlope > 0.001
+    ? Math.round((1 - adjAtCur/rawSlope)*100) : 0;
+  document.getElementById('slopeNarrative').textContent =
+    pctDrop >= 100
+      ? `⚠ Slope nullified: current confound explains 100%+ of the SES gradient.`
+      : pctDrop > 60
+      ? `Confound explains ~${pctDrop}% of gradient — approaching nullification.`
+      : `Current confound r=${(itcvState.rSES*itcvState.rOutcome).toFixed(3)} explains ~${pctDrop}% of the SES slope.`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// INTEGRALS + MINI CHARTS
+// ═══════════════════════════════════════════════════════════
+function numInt1D(fn, a, b, n=80) {
+  const h=(b-a)/n; let s=0;
+  for(let i=0;i<=n;i++){const x=a+i*h, w=(i===0||i===n)?0.5:1; s+=w*fn(x);}
+  return s*h;
+}
+function numInt2D(fn, n=25) {
+  const h=1/n; let s=0;
+  for(let i=0;i<=n;i++) for(let j=0;j<=n;j++){
+    const wx=(i===0||i===n)?0.5:1, wy=(j===0||j===n)?0.5:1;
+    s+=wx*wy*fn(i/n,j/n);
+  }
+  return s*h*h;
+}
+
+function drawMini(id, data, color) {
+  const cvs = document.getElementById(id); if(!cvs) return;
+  const dpr = window.devicePixelRatio||1;
+  const W=cvs.offsetWidth||220, H=cvs.offsetHeight||44;
+  cvs.width=W*dpr; cvs.height=H*dpr;
+  const ctx=cvs.getContext('2d'); ctx.scale(dpr,dpr);
+  const minV=Math.min(...data), maxV=Math.max(...data), rng=maxV-minV||1;
+  ctx.clearRect(0,0,W,H);
+  ctx.beginPath();
+  data.forEach((v,i)=>{
+    const x=i/(data.length-1)*W, y=H-((v-minV)/rng)*H*0.85-H*0.05;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+  ctx.fillStyle=color+'18'; ctx.fill();
+  ctx.beginPath();
+  data.forEach((v,i)=>{
+    const x=i/(data.length-1)*W, y=H-((v-minV)/rng)*H*0.85-H*0.05;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+function updateIntegrals() {
+  const M=38;
+  document.getElementById('totalMass').textContent = numInt2D(f).toFixed(3);
+  document.getElementById('sesGap').textContent    = numInt1D(s=>f(s,probe.t),0,1).toFixed(3);
+  document.getElementById('trendMass').textContent = numInt1D(t=>f(probe.ses,t),0,1).toFixed(3);
+  document.getElementById('divergIdx').textContent = numInt1D(t=>Math.abs(dF_dSES(0.5,t)),0,1).toFixed(3);
+
+  drawMini('miniMass', Array.from({length:M},(_,i)=>numInt1D(s=>f(s,i/(M-1)),0,1)), '#f5c842');
+  drawMini('miniSES',  Array.from({length:M},(_,i)=>f(i/(M-1),probe.t)), '#4fd1b8');
+  drawMini('miniDiv',  Array.from({length:M},(_,i)=>Math.abs(dF_dSES(0.5,i/(M-1)))), '#f5c842');
+  drawMini('miniT',    Array.from({length:M},(_,i)=>f(probe.ses,i/(M-1))), '#ff5c6e');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════
+['alpha','beta','gamma','delta'].forEach(id => {
+  document.getElementById(id).addEventListener('input', e => {
+    params[id] = parseFloat(e.target.value);
+    document.getElementById(id+'Val').textContent = parseFloat(e.target.value).toFixed(2);
+    buildSurface();
+  });
+});
+
+document.getElementById('sesProbe').addEventListener('input', e => {
+  probe.ses = parseFloat(e.target.value);
+  document.getElementById('sesVal').textContent = probe.ses.toFixed(2);
+  updateProbe(); updateDerivatives(); updateIntegrals(); updateITCVPanel();
+});
+document.getElementById('tProbe').addEventListener('input', e => {
+  probe.t = parseFloat(e.target.value);
+  document.getElementById('tVal').textContent = probe.t.toFixed(2);
+  updateProbe(); updateDerivatives(); updateIntegrals(); updateITCVPanel();
+});
+
+document.getElementById('togWire').addEventListener('change', e => {
+  overlays.wire = e.target.checked;
+  if(wireMesh) wireMesh.visible = overlays.wire;
+});
+document.getElementById('togMass').addEventListener('change', e => {
+  overlays.mass = e.target.checked;
+  buildSurface();
+});
+document.getElementById('togSES').addEventListener('change', e => { overlays.ses = e.target.checked; });
+
+document.getElementById('togITCV').addEventListener('change', e => {
+  itcvState.enabled = e.target.checked;
+  overlays.itcv = e.target.checked;
+  document.getElementById('confoundSection').classList.toggle('disabled', !e.target.checked);
+  document.getElementById('itcvIndicator').classList.toggle('on', e.target.checked);
+  document.getElementById('itcvIndicatorText').textContent = e.target.checked ? 'ITCV ON' : 'ITCV OFF';
+  itcvState.prevAdjSlope = null;
+  if (!e.target.checked) {
+    document.getElementById('zeroCrossWarn').classList.remove('visible');
+    document.getElementById('adjBarWrap').classList.remove('visible');
+    document.getElementById('itcvCard').classList.remove('visible');
+  }
+  buildSurface();
+});
+
+// ITCV sliders
+document.getElementById('rSES').addEventListener('input', e => {
+  itcvState.rSES = parseFloat(e.target.value);
+  document.getElementById('rSESVal').textContent = itcvState.rSES.toFixed(2);
+  const combined = itcvState.rSES * itcvState.rOutcome;
+  document.getElementById('confoundBar').style.width = Math.min(100, combined*250)+'%';
+  document.getElementById('confoundVal').textContent = `r_combined = ${combined.toFixed(3)}`;
+  updateDerivatives(); updateITCVPanel(); buildSurface();
+});
+document.getElementById('rOutcome').addEventListener('input', e => {
+  itcvState.rOutcome = parseFloat(e.target.value);
+  document.getElementById('rOutcomeVal').textContent = itcvState.rOutcome.toFixed(2);
+  const combined = itcvState.rSES * itcvState.rOutcome;
+  document.getElementById('confoundBar').style.width = Math.min(100, combined*250)+'%';
+  document.getElementById('confoundVal').textContent = `r_combined = ${combined.toFixed(3)}`;
+  updateDerivatives(); updateITCVPanel(); buildSurface();
+});
+document.getElementById('itcvThresh').addEventListener('input', e => {
+  itcvState.threshold = parseFloat(e.target.value);
+  document.getElementById('itcvThreshVal').textContent = itcvState.threshold.toFixed(2);
+  updateITCVPanel(); buildSurface();
+});
+
+// ═══════════════════════════════════════════════════════════
+// RESIZE + RENDER
+// ═══════════════════════════════════════════════════════════
+function resize() {
+  const w=wrapper.clientWidth, h=wrapper.clientHeight;
+  renderer.setSize(w,h);
+  camera.aspect=w/h;
+  camera.updateProjectionMatrix();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  updateCamera();
+  renderer.render(scene, camera);
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+resize();
+window.addEventListener('resize', resize);
+buildSurface();
+animate();
+</script>
+</body>
+</html>
